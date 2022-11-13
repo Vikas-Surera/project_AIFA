@@ -4,13 +4,23 @@ import {CellNode, PriorityQueue} from "../../algorithms/PriorityQueue";
 import GridView from "../GridView";
 import {constants} from "os";
 import gridView from "../GridView";
+import iitkgp from "../map";
+import iitkgp2 from "../map2";
+import Queue from "../../algorithms/Queue";
 
 interface Props {
 
 }
 
+export enum AlgorithmI {
+    AStar = "AStar",
+    BFS = "BFS",
+    DFS = "DFS",
+}
+
 interface States {
     grid: CellNode[][],
+    walls: number[][],
 
     START_NODE_ROW: number,
     FINISH_NODE_ROW: number,
@@ -35,26 +45,31 @@ interface States {
 
     animationStatus: boolean
     activeCell: CellNode | null
+    algo: AlgorithmI
+
+    speed: number
 }
 
 export default class AStar extends React.Component<Props, States> {
     private openList: PriorityQueue = new PriorityQueue();
     private closeList: CellNode[] = [];
-    private dx: number[] = [-1, 0, 1, 0];
-    private dy: number[] = [0, 1, 0, -1];
+    private openListDFS: CellNode[] = [];
+    private openListBFS: Queue = new Queue();
+    private dx: number[] = [0, 1, 0, -1];
+    private dy: number[] = [1, 0, -1, 0];
 
     constructor(props: Props) {
         super(props);
 
         this.state = {
             grid: [],
-            START_NODE_ROW: 5,
-            FINISH_NODE_ROW: 0,
-            START_NODE_COL: 5,
-            FINISH_NODE_COL: 0,
+            START_NODE_ROW: 9,
+            FINISH_NODE_ROW: 13,
+            START_NODE_COL: 0,
+            FINISH_NODE_COL: 34,
             mouseIsPressed: false,
-            ROW_COUNT: 22,
-            COLUMN_COUNT: 25,
+            ROW_COUNT: 16,
+            COLUMN_COUNT: 35,
             isRunning: false,
             isStartNode: false,
             isFinishNode: false,
@@ -65,7 +80,10 @@ export default class AStar extends React.Component<Props, States> {
             animateCol: 5,
             animateRow: 5,
             animationStatus: false,
-            activeCell: null
+            activeCell: null,
+            walls: [],
+            algo: AlgorithmI.AStar,
+            speed: 50
         }
 
         this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -85,9 +103,12 @@ export default class AStar extends React.Component<Props, States> {
 
     getInitialGrid(rowCount = this.state.ROW_COUNT, colCount = this.state.COLUMN_COUNT) {
         const initialGrid: CellNode[][] = [];
+        const intitalWalls: number[][] = [];
         for (let row = 0; row < rowCount; row++) {
             const currentRow: CellNode[] = [];
+            const currentRowWalls: number[] = [];
             for (let col = 0; col < colCount; col++) {
+                currentRowWalls.push(0);
                 currentRow.push({
                     row: row,
                     col: col,
@@ -97,7 +118,8 @@ export default class AStar extends React.Component<Props, States> {
                     hValue: 0,
 
                     isVisited: false,
-                    isWall: false,
+                    // isWall: iitkgp[row][col],
+                    isWall: iitkgp2[row][col],
                     isStartNode: row === this.state.START_NODE_ROW && col === this.state.START_NODE_COL,
                     isGoalNode: row === this.state.FINISH_NODE_ROW &&
                         col === this.state.FINISH_NODE_COL,
@@ -107,7 +129,9 @@ export default class AStar extends React.Component<Props, States> {
                 });
             }
             initialGrid.push(currentRow);
+            intitalWalls.push(currentRowWalls);
         }
+        this.setState({walls: intitalWalls});
         return initialGrid;
     };
 
@@ -150,12 +174,14 @@ export default class AStar extends React.Component<Props, States> {
                     }
 
                     grid[row][col].isWall = true;
+                    this.state.walls[row][col] = 1;
                     this.setState({
                         mouseIsPressed: true,
                         isWallNode: true,
                         currRow: row,
                         currCol: col,
                         grid: grid,
+                        walls: this.state.walls
                     });
                 }
 
@@ -230,7 +256,9 @@ export default class AStar extends React.Component<Props, States> {
             }
 
             this.openList.clear();
+            this.openListBFS.clear();
             this.closeList = [];
+            this.openListDFS = [];
             this.setState({animateCol: 0, animateRow: 0, grid: grid});
         }
     }
@@ -255,7 +283,14 @@ export default class AStar extends React.Component<Props, States> {
                         // TODO: hard coded
                         document.getElementById(`node-${row}-${col}`)!.className = 'node node-start';
 
-                        this.setState({currRow: row, currCol: col, animateCol: col, animateRow: row, grid, activeCell: grid[row][col]});
+                        this.setState({
+                            currRow: row,
+                            currCol: col,
+                            animateCol: col,
+                            animateRow: row,
+                            grid,
+                            activeCell: grid[row][col]
+                        });
                         this.clearGrid();
                     }
                     this.setState({START_NODE_ROW: row, START_NODE_COL: col});
@@ -284,8 +319,9 @@ export default class AStar extends React.Component<Props, States> {
                     const node = grid[row][col];
                     if (!node.isStartNode && !node.isGoalNode) {
                         grid[row][col].isWall = !grid[row][col].isWall;
+                        this.state.walls[row][col] = this.state.walls[row][col] === 1 ? 0 : 1;
                     }
-                    this.setState({grid});
+                    this.setState({grid, walls: this.state.walls});
                 }
             }
         }
@@ -353,12 +389,247 @@ export default class AStar extends React.Component<Props, States> {
     }
 
     isInClosedList(node: CellNode) {
-        for(let i=0; i<this.closeList.length; i++){
-            if(this.closeList[i].row===node.row && this.closeList[i].col===node.col){
+        for (let i = 0; i < this.closeList.length; i++) {
+            if (this.closeList[i].row === node.row && this.closeList[i].col === node.col) {
                 return true;
             }
         }
         return false;
+    }
+
+    updateCloseList(node: CellNode) {
+        for (let i = 0; i < this.closeList.length; i++) {
+            if (this.closeList[i].row === node.row && this.closeList[i].col === node.col) {
+                this.closeList[i] = node;
+            }
+        }
+    }
+
+    async bfsMoveNext() {
+        // const grid = this.state.grid;
+        if (this.openListBFS.isEmpty()) {
+            this.setState({animationStatus: false});
+            return;
+        }
+        // 6. color green the top node in open list
+        // await this.waitFor();
+        const cur = this.openListBFS.getFront();
+        this.openListBFS.dequeue();
+        const node = this.state.grid[cur.row][cur.col];
+        this.setState({activeCell: node});
+
+        // 1. Goal test
+        if (node.isGoalNode) {
+            // reached the goal
+            // break and show the path
+            // this.animateShortestPath(nodesInShortestPathOrder);
+            this.setState({animationStatus: false});
+            this.markPath();
+            return;
+        }
+
+        if (!node.isStartNode && !node.isGoalNode) document.getElementById(`node-${node.row}-${node.col}`)!.className = 'node active-list-node';
+
+        await this.waitFor();
+        // this.setState({});
+
+        // console.log('Before Open:', this.openList.items);
+        // console.log('Before Close:', this.closeList);
+
+        // 3. get child nodes
+        for (let k = 0; k < 4; k++) {
+            const x = node.row + this.dx[k];
+            const y = node.col + this.dy[k];
+
+            if (x < 0 || x >= this.state.ROW_COUNT || y < 0 || y >= this.state.COLUMN_COUNT) continue;
+
+            const childNode = this.state.grid[x][y];
+
+            if (childNode.isWall) continue;
+
+            if (this.openListBFS.isInOpen(childNode) && childNode.gValue > (node.gValue + 1)) {
+                // update the child node
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+                childNode.previousNode = node;
+
+                this.openListBFS.update(childNode);
+            }
+
+            if (this.isInClosedList(childNode) && childNode.gValue > (node.gValue + 1)) {
+
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+
+                // 4. put children in open list
+                childNode.previousNode = node;
+                this.updateCloseList(childNode);
+
+            }
+
+            if (!this.openListBFS.isInOpen(childNode) && !this.isInClosedList(childNode)) {
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+
+                // 4. put children in open list
+                childNode.previousNode = node;
+                childNode.isInOpenSet = true;
+                this.openListBFS.enqueue(childNode);
+            }
+
+            this.state.grid[x][y] = childNode;
+
+
+            // 5. color yellow the children
+            if (!childNode.isGoalNode && childNode.isInOpenSet) document.getElementById(`node-${childNode.row}-${childNode.col}`)!.className = 'node open-list-node';
+            this.setState({grid: this.state.grid});
+            await this.waitFor();
+        }
+
+        // 2. grey out this node
+        node.isVisited = true;
+        node.isInClosedSet = true;
+        node.isInOpenSet = false;
+
+        this.closeList.push(node);
+        // this.openList.pop();
+
+        // push into close and remove from open
+        this.state.grid[node.row][node.col] = node;
+
+
+        if (!node.isGoalNode && !node.isStartNode) document.getElementById(`node-${node.row}-${node.col}`)!.className = 'node close-list-node';
+
+        console.log('After Open:', this.openList.items);
+        console.log('After Close:', this.closeList);
+
+        // this.setState({animateRow: topNode.row, animateCol: topNode.col});
+        await this.waitFor();
+        this.setState({grid: this.state.grid});
+
+        if (this.state.animationStatus) this.bfsMoveNext();
+    }
+
+    isInOpenDFS(node: CellNode) {
+        for (let i = 0; i < this.openListDFS.length; i++) {
+            if (this.openListDFS[i].row === node.row && this.openListDFS[i].col === node.col) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    updateOpenDFS(node: CellNode) {
+        for (let i = 0; i < this.openListDFS.length; i++) {
+            if (this.openListDFS[i].row === node.row && this.openListDFS[i].col === node.col) {
+                this.openListDFS[i] = node;
+            }
+        }
+    }
+
+    async dfsMoveNext() {
+        // const grid = this.state.grid;
+        if (this.openListDFS.length == 0) {
+            this.setState({animationStatus: false});
+            return;
+        }
+        // 6. color green the top node in open list
+        // await this.waitFor();
+        const cur = this.openListDFS[this.openListDFS.length - 1];
+        this.openListDFS.pop()
+        const node = this.state.grid[cur.row][cur.col];
+        this.setState({activeCell: node});
+
+        // 1. Goal test
+        if (node.isGoalNode) {
+            // reached the goal
+            // break and show the path
+            // this.animateShortestPath(nodesInShortestPathOrder);
+            this.setState({animationStatus: false});
+            this.markPath();
+            return;
+        }
+
+        if (!node.isStartNode && !node.isGoalNode) document.getElementById(`node-${node.row}-${node.col}`)!.className = 'node active-list-node';
+
+        await this.waitFor();
+        // this.setState({});
+
+        // console.log('Before Open:', this.openList.items);
+        // console.log('Before Close:', this.closeList);
+
+        // 3. get child nodes
+        for (let k = 3; k >= 0; k--) {
+            const x = node.row + this.dx[k];
+            const y = node.col + this.dy[k];
+
+            if (x < 0 || x >= this.state.ROW_COUNT || y < 0 || y >= this.state.COLUMN_COUNT) continue;
+
+            const childNode = this.state.grid[x][y];
+
+            if (childNode.isWall) continue;
+
+            if (this.isInOpenDFS(childNode) && childNode.gValue > (node.gValue + 1)) {
+                // update the child node
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+                childNode.previousNode = node;
+
+                this.updateOpenDFS(childNode);
+            }
+
+            if (this.isInClosedList(childNode) && childNode.gValue > (node.gValue + 1)) {
+
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+
+                // 4. put children in open list
+                childNode.previousNode = node;
+                this.updateCloseList(childNode);
+
+            }
+
+            if (!this.isInOpenDFS(childNode) && !this.isInClosedList(childNode)) {
+                childNode.gValue = node.gValue + 1;
+                // childNode.fValue = childNode.gValue + childNode.hValue;
+
+                // 4. put children in open list
+                childNode.previousNode = node;
+                childNode.isInOpenSet = true;
+                this.openListDFS.push(childNode);
+            }
+
+            this.state.grid[x][y] = childNode;
+
+
+            // 5. color yellow the children
+            if (!childNode.isGoalNode && childNode.isInOpenSet) document.getElementById(`node-${childNode.row}-${childNode.col}`)!.className = 'node open-list-node';
+            this.setState({grid: this.state.grid});
+            await this.waitFor();
+        }
+
+        // 2. grey out this node
+        node.isVisited = true;
+        node.isInClosedSet = true;
+        node.isInOpenSet = false;
+
+        this.closeList.push(node);
+        // this.openList.pop();
+
+        // push into close and remove from open
+        this.state.grid[node.row][node.col] = node;
+
+
+        if (!node.isGoalNode && !node.isStartNode) document.getElementById(`node-${node.row}-${node.col}`)!.className = 'node close-list-node';
+
+        console.log('After Open:', this.openList.items);
+        console.log('After Close:', this.closeList);
+
+        // this.setState({animateRow: topNode.row, animateCol: topNode.col});
+        await this.waitFor();
+        this.setState({grid: this.state.grid});
+
+        if (this.state.animationStatus) this.dfsMoveNext();
     }
 
 
@@ -405,16 +676,16 @@ export default class AStar extends React.Component<Props, States> {
 
             if (this.isInClosedList(childNode) || childNode.isWall) continue;
 
-            if(!this.openList.isInOpenSet(childNode)) {
+            if (!this.openList.isInOpenSet(childNode)) {
                 childNode.gValue = node.gValue + 1;
                 childNode.fValue = childNode.gValue + childNode.hValue;
 
                 // 4. put children in open list
                 childNode.previousNode = node;
                 this.openList.push(childNode);
-                node.isInOpenSet = true;
-            }else{
-                if (childNode.isInOpenSet && childNode.gValue >  (node.gValue + 1)) {
+                childNode.isInOpenSet = true;
+            } else {
+                if (childNode.isInOpenSet && childNode.gValue > (node.gValue + 1)) {
                     // update the child node
                     childNode.gValue = node.gValue + 1;
                     childNode.fValue = childNode.gValue + childNode.hValue;
@@ -460,12 +731,12 @@ export default class AStar extends React.Component<Props, States> {
         if (this.state.animationStatus) this.moveNext();
     }
 
-    async markPath(){
+    async markPath() {
         const grid = this.state.grid;
         let cur = this.state.grid[this.state.FINISH_NODE_ROW][this.state.FINISH_NODE_COL];
-        while(cur.previousNode){
+        while (cur.previousNode) {
             document.getElementById(`node-${cur.row}-${cur.col}`)!.className = 'node path-node';
-            await this.waitFor(100);
+            await new Promise(resolve => setTimeout(resolve, 100))
             cur = cur.previousNode;
         }
     }
@@ -482,28 +753,99 @@ export default class AStar extends React.Component<Props, States> {
         grid[row][col].fValue = grid[row][col].hValue + grid[row][col].gValue;
         this.openList.push(grid[row][col]);
 
-        this.setState({grid, animationStatus: true});
+        this.setState({grid, animationStatus: true, algo: AlgorithmI.AStar});
         this.moveNext();
     }
 
-    resume(){
+    async startBFS() {
+        const grid = this.state.grid;
+
+        this.clearGrid();
+        const row = this.state.START_NODE_ROW;
+        const col = this.state.START_NODE_COL;
+
+        grid[row][col].gValue = 0;
+        grid[row][col].fValue = grid[row][col].hValue + grid[row][col].gValue;
+        this.openListBFS.enqueue(grid[row][col]);
+
+        this.setState({grid, animationStatus: true, algo: AlgorithmI.BFS});
+        this.bfsMoveNext();
+    }
+
+    async startDFS() {
+        const grid = this.state.grid;
+
+        this.clearGrid();
+        const row = this.state.START_NODE_ROW;
+        const col = this.state.START_NODE_COL;
+
+        grid[row][col].gValue = 0;
+        grid[row][col].fValue = grid[row][col].hValue + grid[row][col].gValue;
+        this.openListDFS.push(grid[row][col]);
+
+        this.setState({grid, animationStatus: true, algo: AlgorithmI.DFS});
+        this.dfsMoveNext();
+    }
+
+    resume() {
         this.setState({animationStatus: true});
-        this.moveNext();
+
+        const algo = this.state.algo;
+
+        switch (algo) {
+            case AlgorithmI.AStar:
+                return this.moveNext();
+            case AlgorithmI.BFS:
+                return this.bfsMoveNext();
+            case AlgorithmI.DFS:
+                return this.dfsMoveNext();
+        }
+
     }
 
-    async waitFor(ms: number = 50): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    async waitFor(): Promise<void> {
+        const speed = this.state.speed;
+        return new Promise(resolve => setTimeout(resolve, speed));
+    }
+
+    export() {
+        const grid = this.state.grid;
+        const data: boolean[][] = [];
+        for (let i = 0; i < this.state.ROW_COUNT; i++) {
+            const row = [];
+            for (let j = 0; j < this.state.COLUMN_COUNT; j++) {
+                row.push(grid[i][j].isWall);
+            }
+            data.push(row);
+        }
+        console.log(data);
+    }
+
+    getOpenList() {
+        const algo = this.state.algo;
+        switch (algo) {
+            case AlgorithmI.AStar:
+                return this.openList.items;
+            case AlgorithmI.BFS:
+                return this.openListBFS.items;
+            case AlgorithmI.DFS:
+                return this.openListDFS;
+            default:
+                return [];
+        }
     }
 
     render() {
+        // console.log(this.state.walls);
         return <div>
             <nav>
-                <img src={'https://upload.wikimedia.org/wikipedia/en/thumb/1/1c/IIT_Kharagpur_Logo.svg/1200px-IIT_Kharagpur_Logo.svg.png'} />
+                <img
+                    src={'https://upload.wikimedia.org/wikipedia/en/thumb/1/1c/IIT_Kharagpur_Logo.svg/1200px-IIT_Kharagpur_Logo.svg.png'}/>
 
                 <div className={'title'}>
-                    <h5>
-                        A* Path Finding Algorithm
-                    </h5>
+                    <h4>
+                        Optimal Path Navigator for Freshers
+                    </h4>
                     <p>
                         IIT Kharagpur (2022-23) <br/> Vikas Surera, Abhishek Singh, Satyendra Nagar
                     </p>
@@ -516,18 +858,25 @@ export default class AStar extends React.Component<Props, States> {
 
                 <div>
                     <div className={'active-row'}>
-                        <h5 className={'mr-3'}>Active Node:</h5>
+                        <h5 className={'mr-3'}>Current Node:</h5>
                         {
                             this.state.activeCell && <div className={'active-cell'}>
-                             <div>
-                                 ({this.state.activeCell.row}, {this.state.activeCell.col})
-                             </div>
-                            <div>
-                                F: {this.state.activeCell.fValue} G: {this.state.activeCell.gValue} H: {this.state.activeCell.hValue}
-                            </div>
+                                <div>
+                                    Coordinate: ({this.state.activeCell.row}, {this.state.activeCell.col})
+                                </div>
+                                <div>
+                                    {
+                                        this.state.algo === AlgorithmI.AStar ?
+                                            `F: ${this.state.activeCell.fValue} G(Path length): ${this.state.activeCell.gValue} H(heuristic): ${this.state.activeCell.hValue}`
+                                            :
+                                            `G(Path length): ${this.state.activeCell.gValue}`
+                                    }
+                                </div>
                             </div>
                         }
                     </div>
+                    <br/>
+                    <br/>
                     <GridView grid={this.state.grid}
                               handleMouseDown={this.handleMouseDown}
                               handleMouseEnter={this.handleMouseEnter}
@@ -537,42 +886,83 @@ export default class AStar extends React.Component<Props, States> {
                     />
 
                     <br/>
-                    <button
-                        type="button"
-                        className="btn btn-danger mr-2"
-                        onClick={() => this.clearGrid()}>
-                        Clear Grid
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-warning mr-2"
-                        onClick={() => this.clearWalls()}>
-                        Clear Walls
-                    </button>
-                    <button
-                        disabled={!this.state.animationStatus}
-                        type="button"
-                        className="btn btn-warning mr-2"
-                        onClick={() => this.setState({animationStatus: false})}>
-                        Pause
-                    </button>
+                    <br/>
+                    <div>
+                        <button
+                            type="button"
+                            className="btn btn-danger mr-2"
+                            onClick={() => this.clearGrid()}>
+                            Clear Grid
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-warning mr-2"
+                            onClick={() => this.clearWalls()}>
+                            Clear Walls
+                        </button>
+                        <button
+                            disabled={!this.state.animationStatus}
+                            type="button"
+                            className="btn btn-warning mr-2"
+                            onClick={() => this.setState({animationStatus: false})}>
+                            Pause
+                        </button>
 
-                    <button
-                        disabled={this.state.animationStatus}
-                        type="button"
-                        className="btn btn-warning mr-2"
-                        onClick={() => this.resume()}>
-                        Resume
-                    </button>
+                        <button
+                            disabled={this.state.animationStatus}
+                            type="button"
+                            className="btn btn-warning mr-2"
+                            onClick={() => this.resume()}>
+                            Resume
+                        </button>
 
-                    <button
-                        disabled={this.state.animationStatus}
-                        type="button"
-                        className="btn btn-warning mr-2"
-                        // onClick={() => this.setState({animationStatus: true})}>
-                        onClick={() => this.start()}>
-                        Start
-                    </button>
+                        <button
+                            disabled={this.state.animationStatus}
+                            type="button"
+                            className="btn btn-primary mr-2"
+                            // onClick={() => this.setState({animationStatus: true})}>
+                            onClick={() => this.start()}>
+                            A*
+                        </button>
+
+                        <button
+                            disabled={this.state.animationStatus}
+                            type="button"
+                            className="btn btn-primary mr-2"
+                            // onClick={() => this.setState({animationStatus: true})}>
+                            onClick={() => this.startBFS()}>
+                            BFS
+                        </button>
+
+                        <button
+                            disabled={this.state.animationStatus}
+                            type="button"
+                            className="btn btn-primary mr-2"
+                            // onClick={() => this.setState({animationStatus: true})}>
+                            onClick={() => this.startDFS()}>
+                            DFS
+                        </button>
+
+                        {/*<button*/}
+                        {/*    type="button"*/}
+                        {/*    className="btn btn-warning mr-2"*/}
+                        {/*    // onClick={() => this.setState({animationStatus: true})}>*/}
+                        {/*    onClick={() => this.export()}>*/}
+                        {/*    Export*/}
+                        {/*</button>*/}
+                    </div>
+
+                    <br/>
+                    <form>
+                        <div className="form-group">
+                            <div className={'mr-2'} style={{width: '200px'}}>Speed (ms) :</div>
+                            <input type="number" className="form-control" id="exampleInputEmail1" onChange={(e) => {
+                                this.setState({speed: parseInt(e.target.value)});
+                            }}
+                                   aria-describedby="emailHelp" placeholder="Speed" value={this.state.speed}/>
+
+                        </div>
+                    </form>
                 </div>
 
                 <div className={"stack stack-open"}>
@@ -580,9 +970,14 @@ export default class AStar extends React.Component<Props, States> {
                         <div className={'stack-title'}>Open List</div>
                         <div className={'stack-content'}>
                             {
-                                this.openList.items.map((node, index) => {
+                                this.getOpenList().map((node, index) => {
                                     return <div className={`stack-node stack-node-open`} key={index}>
-                                        {`(${node.row}, ${node.col})`} F: {node.fValue} G: {node.gValue} H: {node.hValue}
+                                        {
+                                            this.state.algo === AlgorithmI.AStar ?
+                                                `(${node.row}, ${node.col}) F: ${node.fValue} G: ${node.gValue} H: ${node.hValue}`
+                                                :
+                                                `(${node.row}, ${node.col}) G: ${node.gValue}`
+                                        }
                                     </div>
                                 })}
                         </div>
@@ -596,7 +991,12 @@ export default class AStar extends React.Component<Props, States> {
                             {
                                 this.closeList.map((node, index) => {
                                     return <div className={`stack-node stack-node-close`} key={index}>
-                                        {`(${node.row}, ${node.col})`} F: {node.fValue} G: {node.gValue} H: {node.hValue}
+                                        {
+                                            this.state.algo === AlgorithmI.AStar ?
+                                                `(${node.row}, ${node.col}) F: ${node.fValue} G: ${node.gValue} H: ${node.hValue}`
+                                                :
+                                                `(${node.row}, ${node.col}) G: ${node.gValue}`
+                                        }
                                     </div>
                                 })}
                         </div>
@@ -630,7 +1030,6 @@ export default class AStar extends React.Component<Props, States> {
             }
             {/*</button>*/
             }
-        </div>
-            ;
+        </div>;
     }
 }

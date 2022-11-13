@@ -41,6 +41,7 @@
   /*background-color: red;*/
   display: flex;
   padding: 20px;
+  justify-content: center;
 }
 
 
@@ -115,6 +116,68 @@ nav img{
 .active-cell{
   background-color: #e0fc9e;
   padding: 5px 0;
-  width: 200px;
+  width: 300px;
   border-radius: 5px;
+}
+
+form  .form-group{
+  display: flex;
+  width: 450px;
+  align-items: center;
+  margin: auto;
+}
+
+table{
+  position: relative;
+}
+
+table p{
+  z-index: 100;
+  position: absolute;
+  color: #000000;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+#d-nalanda{
+  bottom: -50px;
+  right: 20px;
+}
+
+#d-techm{
+    bottom: 160px;
+    left: -70px;
+}
+
+#d-prem{
+  bottom: -50px;
+  left: 50%;
+}
+
+#d-puri{
+  top: -10px;
+  left: 60%;
+}
+
+#d-main{
+  height: 65px;
+  width: auto;
+  top: 35%;
+  left: 70%;
+}
+
+#d-main img{
+  height: 100%;
+  width: auto;
+}
+
+#d-gate{
+  height: 65px;
+  width: auto;
+  top: -35px;
+  left: 53%;
+}
+
+#d-gate img{
+  height: 100%;
 }

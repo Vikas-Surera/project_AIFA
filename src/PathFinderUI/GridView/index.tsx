@@ -24,20 +24,41 @@ const GridView = ({
         className="grid-container"
         onMouseLeave={() => handleMouseLeave()}>
         <tbody className="grid">
-        {/*<tr>*/}
-        {/*    {*/}
-        {/*        grid[0] && grid[0].map((node, col) => {*/}
-        {/*          return <td*/}
-        {/*              className={'node node-header'}*/}
-        {/*                key={col}>*/}
-        {/*              {col}*/}
-        {/*          </td>*/}
-        {/*        })*/}
-        {/*    }*/}
-        {/*</tr>*/}
+        <p id={'d-nalanda'}>To Nalanda</p>
+        <p id={'d-gate'}>
+            <img src={'/gate.png'} alt={'Gate'}/>
+        </p>
+        <p id={'d-techm'}>Tech M</p>
+        <p id={'d-prem'}>To Prem Bazar</p>
+        <p id={'d-puri'}>To Puri Gate</p>
+        <p id={'d-main'}>
+            <img src={'/kgp_icon.jpeg ' }/>
+        </p>
+        <tr style={{opacity: '0'}}>
+            <td
+                className={'node node-header'}
+                >
+                {0}
+            </td>
+            {
+                grid[0] && grid[0].map((node, col) => {
+                  return <td
+                      className={'node node-header'}
+                        key={col}>
+                      {col+1}
+                  </td>
+                })
+            }
+        </tr>
         {grid.map((row, rowIdx) => {
             return (
                 <tr key={rowIdx}>
+                    <td
+                        style={{opacity: '0'}}
+                        className={'node node-header'}>
+
+                        {rowIdx+1}
+                    </td>
                     {row.map((node, nodeIdx) => {
                         const {row, col, isGoalNode, isStartNode, isWall} = node;
                         return (

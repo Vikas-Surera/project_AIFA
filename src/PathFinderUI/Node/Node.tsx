@@ -54,7 +54,7 @@ export default class NodeUI extends Component<NodeProps, {}> {
                         {/*<br/>*/}
                         {/*h={this.props.node.hValue}*/}
                         {
-                            // `(${this.props.node.row}, ${this.props.node.col})`
+                            // `${this.props.node.col}`
                         }
                     </p>
                 }
